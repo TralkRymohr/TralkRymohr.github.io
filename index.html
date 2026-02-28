@@ -1,35 +1,263 @@
 <!DOCTYPE html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <link rel="stylesheet" href="css/style.css" />
-    <title>Weird</title>
-    <meta name="author" content="tralk" />
-    <style type="text/css"> body { background-color:#202850; }</style>
-    
-  </head>
-  <body>
-    <div id="game">
-      <canvas id="mainCanvas" width="256" height="224">No Canvas Support</canvas>
+<html lang="auto">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Stretch Image</title>
+
+<style>
+html, body{
+    margin:0;
+    padding:0;
+    background:#ffffff;
+    overflow-x:hidden;
+    font-family:Arial, sans-serif;
+    color:#222;
+}
+
+/* contenedor principal */
+.contenedor{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    padding-top:40px;
+    padding-bottom:120px;
+}
+
+img{
+    width:220px;
+    user-select:none;
+    pointer-events:none;
+}
+
+#cuerpo{
+    height:120px;
+    object-fit:fill;
+    transform-origin:top;
+    transition:height 0.05s linear;
+}
+
+/* indicador */
+.medidor{
+    position:fixed;
+    left:15px;
+    top:15px;
+    background:rgba(0,0,0,.08);
+    backdrop-filter:blur(6px);
+    padding:10px 14px;
+    border-radius:14px;
+    font-size:14px;
+    z-index:999;
+}
+
+/* botón */
+.reset-btn{
+    position:fixed;
+    right:15px;
+    bottom:20px;
+    background:#ff4d6d;
+    border:none;
+    color:white;
+    padding:14px 18px;
+    border-radius:999px;
+    font-size:14px;
+    cursor:pointer;
+    box-shadow:0 8px 25px rgba(0,0,0,.25);
+    z-index:999;
+}
+
+/* texto inferior */
+.instrucciones{
+    margin-top:20px;
+    font-size:14px;
+    opacity:.7;
+    text-align:center;
+    padding:0 20px;
+}
+
+/* =========================
+   🗺️ MINIMAPA REAL
+========================= */
+
+.minimap{
+    position:fixed;
+    right:15px;
+    top:15px;
+    width:90px;
+    height:180px;
+    border-radius:12px;
+    overflow:hidden;
+    background:#f0f0f0;
+    border:1px solid rgba(0,0,0,.15);
+    z-index:999;
+}
+
+.mini-inner{
+    transform-origin:top center;
+}
+
+.viewport{
+    position:absolute;
+    left:0;
+    width:100%;
+    border:2px solid #ff4d6d;
+    border-radius:6px;
+    pointer-events:none;
+    box-sizing:border-box;
+}
+</style>
+</head>
+
+<body>
+
+<div class="medidor" id="medidor">...</div>
+<button class="reset-btn" id="btnReset" onclick="resetear()">Reset</button>
+
+<!-- minimapa -->
+<div class="minimap">
+    <div class="mini-inner" id="miniInner">
+        <img src="cabeza.png">
+        <img src="cuerpo.png" id="miniCuerpo">
+        <img src="base.png">
     </div>
-    <div id="controller">
-      <div id="controller_dpad">
-        <div id="controller_left"></div>
-        <div id="controller_right"></div>
-        <div id="controller_up"></div>
-        <div id="controller_down"></div>
-      </div>
-      <div id="controller_select" class="capsuleBtn">Select</div>
-      <div id="controller_start" class="capsuleBtn">Start</div>
-      <div id="controller_b" class="roundBtn">B</div>
-      <div id="controller_a" class="roundBtn">A</div>
-    </div>      
-    <script>
-      const customControls = {"up":["ArrowUp","w"],"down":["ArrowDown","s"],"left":["ArrowLeft","a"],"right":["ArrowRight","d"],"a":["Alt","z","j"],"b":["Control","k","x"],"start":["Enter"],"select":["Shift"]}
-    </script>
-    <script src="binjgb.js"></script>
-    <script src="js/script.js"></script>
-    <script src="js/debugger.js"></script>
+    <div class="viewport" id="viewport"></div>
+</div>
+
+<div class="contenedor" id="contenedor">
+    <img src="cabeza.png">
+    <img src="cuerpo.png" id="cuerpo">
+    <img src="base.png">
+
+    <div class="instrucciones" id="instrucciones">
+        Usa la rueda o desliza para expandir/contraer
+    </div>
+</div>
+
+<script>
+/* 🌍 idioma */
+const idioma = navigator.language.slice(0,2);
+
+const textos = {
+    es:{longitud:"Longitud",reset:"Restablecer",
+        instruccion:"Usa la rueda o desliza para expandir/contraer"},
+    en:{longitud:"Length",reset:"Reset",
+        instruccion:"Use the wheel or swipe to expand/contract"}
+};
+
+const t = textos[idioma] || textos.en;
+
+document.getElementById("btnReset").textContent = t.reset;
+document.getElementById("instrucciones").textContent = t.instruccion;
+
+const medidor = document.getElementById("medidor");
+
+/* config */
+let altura = 120;
+let velocidad = 0;
+let touchStartY = null;
+
+const MIN = 120;
+const MAX = 999999;
+const FRICCION = 0.88;
+const ELASTICIDAD = 0.15;
+
+const cuerpo = document.getElementById("cuerpo");
+const miniCuerpo = document.getElementById("miniCuerpo");
+const miniInner = document.getElementById("miniInner");
+const viewport = document.getElementById("viewport");
+const contenedor = document.getElementById("contenedor");
+
+/* vibración */
+function vibrar(ms){
+    if(navigator.vibrate) navigator.vibrate(ms);
+}
+
+/* auto follow */
+function autoFollow(){
+    const rect = contenedor.getBoundingClientRect();
+    const destino = rect.bottom + window.scrollY - window.innerHeight + 40;
+    window.scrollTo({top:Math.max(0,destino)});
+}
+
+/* látigo */
+function irHastaBase(){
+    const rect = contenedor.getBoundingClientRect();
+    const destino = rect.bottom + window.scrollY - window.innerHeight + 20;
+    window.scrollTo({top:Math.max(0,destino),behavior:"smooth"});
+}
+
+/* rueda */
+window.addEventListener("wheel",(e)=>{
+    velocidad += e.deltaY * 0.10;
+    velocidad = Math.max(-40, Math.min(velocidad, 40));
+});
+
+/* touch */
+window.addEventListener("touchstart",(e)=>{
+    touchStartY = e.touches[0].clientY;
+},{passive:true});
+
+window.addEventListener("touchmove",(e)=>{
+    if(touchStartY===null) return;
+    const y = e.touches[0].clientY;
+    const delta = touchStartY - y;
+    velocidad += delta * 0.15;
+    velocidad = Math.max(-40, Math.min(velocidad, 40));
+    touchStartY = y;
+},{passive:true});
+
+window.addEventListener("touchend",()=> touchStartY=null);
+
+/* animación */
+function animar(){
+
+    altura += velocidad;
+    velocidad *= FRICCION;
+
+    if(altura < MIN){
+        altura = MIN;
+        velocidad = 0;
+    }
+
+    if(altura > MAX){
+        velocidad -= (altura - MAX) * ELASTICIDAD;
+        vibrar(12);
+        if(velocidad > 18) irHastaBase();
+    }
+
+    cuerpo.style.height = altura + "px";
+    miniCuerpo.style.height = altura + "px";
+
+    medidor.textContent =
+        `${t.longitud}: ${Math.floor(altura)} px`;
+
+    /* 🗺️ ESCALA REAL DEL MINIMAPA */
+    const totalHeight = contenedor.scrollHeight;
+    const scale = 180 / totalHeight;
+    miniInner.style.transform = `scale(${scale})`;
+
+    /* viewport */
+    const viewRatio = window.innerHeight / totalHeight;
+    const viewHeight = Math.max(10, viewRatio * 180);
+    const scrollRatio = window.scrollY / (document.body.scrollHeight - window.innerHeight);
+
+    viewport.style.height = viewHeight + "px";
+    viewport.style.top = (scrollRatio * (180 - viewHeight)) + "px";
+
+    if(velocidad > 1.2) autoFollow();
+
+    requestAnimationFrame(animar);
+}
+animar();
+
+/* reset */
+function resetear(){
+    altura = MIN;
+    velocidad = 0;
+    window.scrollTo({top:0,behavior:"smooth"});
+    vibrar(30);
+}
+</script>
+
 </body>
+</html>
