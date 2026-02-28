@@ -3,260 +3,208 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Stretch Image</title>
+<title>Imagen Expandible</title>
 
 <style>
-html, body{
+  body{
     margin:0;
-    padding:0;
-    background:#ffffff;
-    overflow-x:hidden;
+    background:white;
     font-family:Arial, sans-serif;
-    color:#222;
-}
+    overflow-y:auto;
+  }
 
-/* contenedor principal */
-.contenedor{
+  .contenedor{
     display:flex;
     flex-direction:column;
     align-items:center;
-    padding-top:40px;
-    padding-bottom:120px;
-}
+    position:relative;
+  }
 
-img{
-    width:220px;
+  img{
+    width:200px;
+    display:block;
     user-select:none;
     pointer-events:none;
-}
+  }
 
-#cuerpo{
-    height:120px;
+  .cuerpo{
+    height:200px;
     object-fit:fill;
-    transform-origin:top;
-    transition:height 0.05s linear;
-}
+    transition:height 0.08s linear;
+  }
 
-/* indicador */
-.medidor{
+  /* indicador longitud */
+  .indicador{
     position:fixed;
-    left:15px;
     top:15px;
-    background:rgba(0,0,0,.08);
-    backdrop-filter:blur(6px);
-    padding:10px 14px;
-    border-radius:14px;
+    right:15px;
+    background:rgba(0,0,0,0.7);
+    color:white;
+    padding:8px 12px;
+    border-radius:10px;
     font-size:14px;
-    z-index:999;
-}
+    z-index:1000;
+  }
 
-/* botón */
-.reset-btn{
+  /* botón reset */
+  .reset{
     position:fixed;
     right:15px;
     bottom:20px;
-    background:#ff4d6d;
-    border:none;
+    background:#007bff;
     color:white;
-    padding:14px 18px;
-    border-radius:999px;
+    border:none;
+    padding:12px 16px;
+    border-radius:50px;
     font-size:14px;
     cursor:pointer;
-    box-shadow:0 8px 25px rgba(0,0,0,.25);
-    z-index:999;
-}
+    box-shadow:0 4px 10px rgba(0,0,0,0.2);
+    z-index:1000;
+  }
 
-/* texto inferior */
-.instrucciones{
-    margin-top:20px;
-    font-size:14px;
-    opacity:.7;
+  .reset:active{
+    transform:scale(0.95);
+  }
+
+  /* texto inferior */
+  .info{
     text-align:center;
-    padding:0 20px;
-}
+    margin:40px 10px;
+    color:#333;
+    font-size:14px;
+  }
 
-/* =========================
-   🗺️ MINIMAPA REAL
-========================= */
-
-.minimap{
+  /* minimapa */
+  .minimap{
     position:fixed;
-    right:15px;
-    top:15px;
-    width:90px;
-    height:180px;
-    border-radius:12px;
-    overflow:hidden;
+    left:10px;
+    bottom:10px;
+    width:80px;
+    height:140px;
     background:#f0f0f0;
-    border:1px solid rgba(0,0,0,.15);
-    z-index:999;
-}
+    border:1px solid #ccc;
+    border-radius:8px;
+    overflow:hidden;
+    z-index:1000;
+  }
 
-.mini-inner{
+  .mini-wrapper{
     transform-origin:top center;
-}
-
-.viewport{
-    position:absolute;
-    left:0;
     width:100%;
-    border:2px solid #ff4d6d;
-    border-radius:6px;
-    pointer-events:none;
-    box-sizing:border-box;
-}
+  }
+
+  .mini-wrapper img{
+    width:100%;
+  }
+
 </style>
 </head>
-
 <body>
 
-<div class="medidor" id="medidor">...</div>
-<button class="reset-btn" id="btnReset" onclick="resetear()">Reset</button>
+<div class="indicador" id="indicador">0 px</div>
+
+<button class="reset" id="resetBtn">Reset</button>
+
+<div class="contenedor" id="contenedor">
+    <img src="cabeza.png" class="cabeza" alt="Top">
+    <img src="cuerpo.png" class="cuerpo" id="cuerpo" alt="Body">
+    <img src="base.png" class="base" alt="Bottom">
+</div>
+
+<div class="info" id="infoText">
+Usa la rueda o desliza para expandir/contraer
+</div>
 
 <!-- minimapa -->
 <div class="minimap">
-    <div class="mini-inner" id="miniInner">
-        <img src="cabeza.png">
-        <img src="cuerpo.png" id="miniCuerpo">
-        <img src="base.png">
-    </div>
-    <div class="viewport" id="viewport"></div>
-</div>
-
-<div class="contenedor" id="contenedor">
+  <div class="mini-wrapper" id="miniWrapper">
     <img src="cabeza.png">
-    <img src="cuerpo.png" id="cuerpo">
+    <img src="cuerpo.png" id="miniCuerpo">
     <img src="base.png">
-
-    <div class="instrucciones" id="instrucciones">
-        Usa la rueda o desliza para expandir/contraer
-    </div>
+  </div>
 </div>
 
 <script>
-/* 🌍 idioma */
-const idioma = navigator.language.slice(0,2);
+let cuerpo = document.getElementById("cuerpo");
+let miniCuerpo = document.getElementById("miniCuerpo");
+let indicador = document.getElementById("indicador");
+let resetBtn = document.getElementById("resetBtn");
 
+let altura = 200;
+let minAltura = 200;
+let maxAltura = 6000;
+
+/* 🔥 traducciones (10 idiomas) */
 const textos = {
-    es:{longitud:"Longitud",reset:"Restablecer",
-        instruccion:"Usa la rueda o desliza para expandir/contraer"},
-    en:{longitud:"Length",reset:"Reset",
-        instruccion:"Use the wheel or swipe to expand/contract"}
+  es:{info:"Usa la rueda o desliza para expandir/contraer",reset:"Reset"},
+  en:{info:"Use wheel or swipe to expand/shrink",reset:"Reset"},
+  pt:{info:"Use a roda ou deslize para expandir/recolher",reset:"Reset"},
+  fr:{info:"Utilisez la molette ou glissez pour étendre/réduire",reset:"Reset"},
+  de:{info:"Mausrad oder Wischen zum Erweitern/Verkleinern",reset:"Reset"},
+  it:{info:"Usa la rotella o scorri per espandere/ridurre",reset:"Reset"},
+  ru:{info:"Используйте колесо или свайп для изменения",reset:"Сброс"},
+  ja:{info:"ホイールまたはスワイプで伸縮",reset:"リセット"},
+  zh:{info:"使用滚轮或滑动来伸缩",reset:"重置"},
+  ko:{info:"휠 또는 스와이프로 늘리기/줄이기",reset:"리셋"}
 };
 
-const t = textos[idioma] || textos.en;
+/* detectar idioma */
+let lang = navigator.language.slice(0,2);
+if(!textos[lang]) lang="en";
 
-document.getElementById("btnReset").textContent = t.reset;
-document.getElementById("instrucciones").textContent = t.instruccion;
+document.getElementById("infoText").textContent = textos[lang].info;
+resetBtn.textContent = textos[lang].reset;
 
-const medidor = document.getElementById("medidor");
+/* actualizar tamaño */
+function actualizar(){
+  cuerpo.style.height = altura + "px";
+  miniCuerpo.style.height = altura + "px";
+  indicador.textContent = altura + " px";
 
-/* config */
-let altura = 120;
-let velocidad = 0;
-let touchStartY = null;
+  /* auto follow */
+  window.scrollTo({
+    top:document.body.scrollHeight,
+    behavior:"auto"
+  });
 
-const MIN = 120;
-const MAX = 99999;
-const FRICCION = 0.88;
-const ELASTICIDAD = 0.15;
-
-const cuerpo = document.getElementById("cuerpo");
-const miniCuerpo = document.getElementById("miniCuerpo");
-const miniInner = document.getElementById("miniInner");
-const viewport = document.getElementById("viewport");
-const contenedor = document.getElementById("contenedor");
-
-/* vibración */
-function vibrar(ms){
-    if(navigator.vibrate) navigator.vibrate(ms);
+  /* vibración suave */
+  if(navigator.vibrate){
+    navigator.vibrate(5);
+  }
 }
 
-/* auto follow */
-function autoFollow(){
-    const rect = contenedor.getBoundingClientRect();
-    const destino = rect.bottom + window.scrollY - window.innerHeight + 40;
-    window.scrollTo({top:Math.max(0,destino)});
-}
-
-/* látigo */
-function irHastaBase(){
-    const rect = contenedor.getBoundingClientRect();
-    const destino = rect.bottom + window.scrollY - window.innerHeight + 20;
-    window.scrollTo({top:Math.max(0,destino),behavior:"smooth"});
-}
-
-/* rueda */
-window.addEventListener("wheel",(e)=>{
-    velocidad += e.deltaY * 0.10;
-    velocidad = Math.max(-40, Math.min(velocidad, 40));
+/* rueda (más lento) */
+window.addEventListener("wheel", e=>{
+  altura += e.deltaY * 0.4; // 🔥 más lento
+  altura = Math.max(minAltura, Math.min(maxAltura, altura));
+  actualizar();
 });
 
-/* touch */
-window.addEventListener("touchstart",(e)=>{
-    touchStartY = e.touches[0].clientY;
-},{passive:true});
+/* touch móvil */
+let startY=null;
 
-window.addEventListener("touchmove",(e)=>{
-    if(touchStartY===null) return;
-    const y = e.touches[0].clientY;
-    const delta = touchStartY - y;
-    velocidad += delta * 0.15;
-    velocidad = Math.max(-40, Math.min(velocidad, 40));
-    touchStartY = y;
-},{passive:true});
+window.addEventListener("touchstart",e=>{
+  startY = e.touches[0].clientY;
+});
 
-window.addEventListener("touchend",()=> touchStartY=null);
-
-/* animación */
-function animar(){
-
-    altura += velocidad;
-    velocidad *= FRICCION;
-
-    if(altura < MIN){
-        altura = MIN;
-        velocidad = 0;
-    }
-
-    if(altura > MAX){
-        velocidad -= (altura - MAX) * ELASTICIDAD;
-        vibrar(12);
-        if(velocidad > 18) irHastaBase();
-    }
-
-    cuerpo.style.height = altura + "px";
-    miniCuerpo.style.height = altura + "px";
-
-    medidor.textContent =
-        `${t.longitud}: ${Math.floor(altura)} px`;
-
-    /* 🗺️ ESCALA REAL DEL MINIMAPA */
-    const totalHeight = contenedor.scrollHeight;
-    const scale = 180 / totalHeight;
-    miniInner.style.transform = `scale(${scale})`;
-
-    /* viewport */
-    const viewRatio = window.innerHeight / totalHeight;
-    const viewHeight = Math.max(10, viewRatio * 180);
-    const scrollRatio = window.scrollY / (document.body.scrollHeight - window.innerHeight);
-
-    viewport.style.height = viewHeight + "px";
-    viewport.style.top = (scrollRatio * (180 - viewHeight)) + "px";
-
-    if(velocidad > 1.2) autoFollow();
-
-    requestAnimationFrame(animar);
-}
-animar();
+window.addEventListener("touchmove",e=>{
+  if(startY===null) return;
+  let diff = startY - e.touches[0].clientY;
+  altura += diff * 0.35;
+  altura = Math.max(minAltura, Math.min(maxAltura, altura));
+  actualizar();
+  startY = e.touches[0].clientY;
+});
 
 /* reset */
-function resetear(){
-    altura = MIN;
-    velocidad = 0;
-    window.scrollTo({top:0,behavior:"smooth"});
-    vibrar(30);
-}
+resetBtn.addEventListener("click",()=>{
+  altura = minAltura;
+  actualizar();
+  window.scrollTo({top:0,behavior:"smooth"});
+});
+
+/* inicial */
+actualizar();
 </script>
 
 </body>
