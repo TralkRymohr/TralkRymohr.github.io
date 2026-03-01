@@ -183,6 +183,22 @@
         .layer-header button:hover {
             background: #8e3a3a;
         }
+        .layer-order-buttons {
+            display: flex;
+            gap: 5px;
+        }
+        .layer-order-buttons button {
+            background: #54A6FF;
+            border: 1px solid #2d6bb8;
+            padding: 5px 10px;
+            font-size: 16px;
+            border-radius: 20px;
+            color: white;
+            cursor: pointer;
+        }
+        .layer-order-buttons button:hover {
+            background: #7ac0ff;
+        }
         .control-row {
             margin-bottom: 12px;
             display: flex;
@@ -337,7 +353,7 @@
     const playPauseBtn = document.getElementById('playPauseBtn');
     const speedSlider = document.getElementById('speedSlider');
 
-    let backgroundImage = null;
+    // Ya no usamos backgroundImage global, lo obtenemos de la capa de fondo
     let canvasWidth = 800, canvasHeight = 600;
     let layers = [];
     let selectedLayerIndex = -1;
@@ -352,11 +368,12 @@
     const generateId = () => Date.now() + '-' + Math.random().toString(36).substr(2, 9);
 
     function resizeCanvasToBackground() {
-        if (backgroundImage) {
-            canvas.width = backgroundImage.width;
-            canvas.height = backgroundImage.height;
-            canvasWidth = backgroundImage.width;
-            canvasHeight = backgroundImage.height;
+        const bgLayer = layers.find(l => l.type === 'background');
+        if (bgLayer) {
+            canvas.width = bgLayer.width;
+            canvas.height = bgLayer.height;
+            canvasWidth = bgLayer.width;
+            canvasHeight = bgLayer.height;
             dimensionInfo.innerText = `Resolución: ${canvasWidth} x ${canvasHeight}`;
         } else {
             canvas.width = 800;
@@ -387,7 +404,7 @@
         let finalHeight = height * (extraTransform.scale || 1);
         let finalRotation = (layer.rotation || 0) + (extraTransform.rotation || 0);
 
-        if (layer.type === 'image') {
+        if (layer.type === 'image' || layer.type === 'background') {
             if (!layer.image) return;
             if (finalRotation !== 0) {
                 const cx = finalX + finalWidth / 2;
@@ -529,9 +546,9 @@
         ctx.restore();
     }
 
-    // Función auxiliar para dibujar hexágono (CORREGIDA: se añadió beginPath)
+    // Función auxiliar para dibujar hexágono
     function drawHexagon(x, y, size) {
-        ctx.beginPath();  // <-- importante para no acumular trazados anteriores
+        ctx.beginPath();
         for (let i = 0; i < 6; i++) {
             const angle = (Math.PI / 3) * i;
             const nextAngle = (Math.PI / 3) * (i + 1);
@@ -552,7 +569,7 @@
             return;
         }
 
-        if (layer.pattern) {
+        if (layer.pattern && layer.type !== 'background') { // No pattern para fondo
             let baseWidth, baseHeight;
             if (layer.type === 'image') {
                 baseWidth = layer.width;
@@ -671,7 +688,7 @@
                 }
             }
         } else {
-            if (layer.type === 'image') {
+            if (layer.type === 'image' || layer.type === 'background') {
                 drawElement(layer, layer.x, layer.y, layer.width, layer.height);
             } else if (layer.type === 'text') {
                 drawElement(layer, layer.x, layer.y);
@@ -681,13 +698,11 @@
 
     function renderCanvas(showSelection = true) {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        if (backgroundImage) {
-            ctx.drawImage(backgroundImage, 0, 0);
-        } else {
-            ctx.fillStyle = '#1a1a2e';
-            ctx.fillRect(0, 0, canvas.width, canvas.height);
-        }
+        // Fondo sólido por defecto (si no hay capa de fondo, se verá este)
+        ctx.fillStyle = '#1a1a2e';
+        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
+        // Dibujar todas las capas en orden (la capa de fondo puede estar en cualquier posición)
         layers.forEach(layer => drawLayer(layer));
 
         if (showSelection && selectedLayerIndex !== -1 && layers[selectedLayerIndex]) {
@@ -696,7 +711,7 @@
             ctx.strokeStyle = '#FF8FCF';
             ctx.lineWidth = 3;
             ctx.setLineDash([8, 8]);
-            if (layer.type === 'image') {
+            if (layer.type === 'image' || layer.type === 'background') {
                 ctx.strokeRect(layer.x, layer.y, layer.width, layer.height);
             } else if (layer.type === 'text') {
                 ctx.font = `${layer.fontSize}px ${layer.fontFamily}`;
@@ -730,6 +745,32 @@
         }
     }
 
+    function moveLayerUp(index) {
+        if (index > 0) {
+            [layers[index - 1], layers[index]] = [layers[index], layers[index - 1]];
+            if (selectedLayerIndex === index) {
+                selectedLayerIndex = index - 1;
+            } else if (selectedLayerIndex === index - 1) {
+                selectedLayerIndex = index;
+            }
+            updateLayersPanel();
+            renderCanvas();
+        }
+    }
+
+    function moveLayerDown(index) {
+        if (index < layers.length - 1) {
+            [layers[index], layers[index + 1]] = [layers[index + 1], layers[index]];
+            if (selectedLayerIndex === index) {
+                selectedLayerIndex = index + 1;
+            } else if (selectedLayerIndex === index + 1) {
+                selectedLayerIndex = index;
+            }
+            updateLayersPanel();
+            renderCanvas();
+        }
+    }
+
     function updateLayersPanel() {
         layersContainer.innerHTML = '';
         layers.forEach((layer, index) => {
@@ -740,13 +781,23 @@
             const header = document.createElement('div');
             header.className = 'layer-header';
             let typeIcon = '';
-            if (layer.type === 'image') typeIcon = '🖼️ Imagen';
+            if (layer.type === 'background') typeIcon = '🔒 Fondo';
+            else if (layer.type === 'image') typeIcon = '🖼️ Imagen';
             else if (layer.type === 'text') typeIcon = '✏️ Texto';
             else if (layer.type === 'generative') typeIcon = '✨ Generativo';
+
+            const orderDiv = document.createElement('div');
+            orderDiv.className = 'layer-order-buttons';
+            orderDiv.innerHTML = `
+                <button class="move-up" data-index="${index}" title="Subir capa">⬆️</button>
+                <button class="move-down" data-index="${index}" title="Bajar capa">⬇️</button>
+            `;
+
             header.innerHTML = `
                 <span>${typeIcon}</span>
                 <button class="delete-layer" data-index="${index}">🗑️ Eliminar</button>
             `;
+            header.insertBefore(orderDiv, header.lastElementChild);
             card.appendChild(header);
 
             const opacityRow = document.createElement('div');
@@ -768,7 +819,8 @@
                 card.appendChild(rotRow);
             }
 
-            if (layer.type !== 'generative') {
+            // Patrón solo para image/text (no para background ni generative)
+            if (layer.type !== 'generative' && layer.type !== 'background') {
                 const patternRow = document.createElement('div');
                 patternRow.className = 'control-row';
                 patternRow.innerHTML = `
@@ -807,7 +859,7 @@
                 }
             }
 
-            if (layer.type === 'image') {
+            if (layer.type === 'image' || layer.type === 'background') {
                 const origW = layer.originalWidth || layer.width;
                 const origH = layer.originalHeight || layer.height;
                 const scale = (layer.width / origW) * 100;
@@ -893,7 +945,6 @@
                 lineWidthRow.innerHTML = `<label>Grosor</label><input type="range" min="1" max="20" step="1" value="${layer.lineWidth || 2}" class="generative-linewidth" data-index="${index}"> <span>${layer.lineWidth || 2}</span>`;
                 card.appendChild(lineWidthRow);
 
-                // NUEVO: Control de escala para generativos (ahora con máximo 5)
                 const scaleRow = document.createElement('div');
                 scaleRow.className = 'control-row';
                 scaleRow.innerHTML = `<label>Escala</label><input type="range" min="0.1" max="5" step="0.1" value="${layer.generativeScale || 1}" class="generative-scale" data-index="${index}"> <span>${(layer.generativeScale || 1).toFixed(1)}x</span>`;
@@ -903,7 +954,7 @@
             layersContainer.appendChild(card);
         });
 
-        // Event listeners para opciones de generativos
+        // Event listeners (igual que antes, pero adaptados para incluir background)
         document.querySelectorAll('.generative-scale').forEach(slider => {
             slider.addEventListener('input', e => {
                 const idx = e.target.dataset.index;
@@ -981,14 +1032,19 @@
             slider.addEventListener('input', e => {
                 const idx = e.target.dataset.index;
                 const layer = layers[idx];
-                if (!layer || layer.type !== 'image') return;
+                if (!layer || (layer.type !== 'image' && layer.type !== 'background')) return;
                 const scale = parseInt(e.target.value) / 100;
                 const origW = layer.originalWidth || layer.width;
                 const origH = layer.originalHeight || layer.height;
                 layer.width = Math.round(origW * scale);
                 layer.height = Math.round(origH * scale);
                 e.target.nextElementSibling.innerText = Math.round(scale * 100) + '%';
-                renderCanvas();
+                // Si es la capa de fondo, redimensionar canvas
+                if (layer.type === 'background') {
+                    resizeCanvasToBackground();
+                } else {
+                    renderCanvas();
+                }
             });
         });
 
@@ -1101,11 +1157,32 @@
             btn.addEventListener('click', e => {
                 e.stopPropagation();
                 const idx = parseInt(e.target.dataset.index);
+                const deletedLayer = layers[idx];
                 layers.splice(idx, 1);
+                if (deletedLayer.type === 'background') {
+                    // Si se eliminó el fondo, redimensionar al tamaño por defecto
+                    resizeCanvasToBackground();
+                }
                 if (selectedLayerIndex >= idx) selectedLayerIndex--;
                 if (selectedLayerIndex < -1) selectedLayerIndex = -1;
                 updateLayersPanel();
                 renderCanvas();
+            });
+        });
+
+        document.querySelectorAll('.move-up').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.stopPropagation();
+                const idx = parseInt(e.target.dataset.index);
+                moveLayerUp(idx);
+            });
+        });
+
+        document.querySelectorAll('.move-down').forEach(btn => {
+            btn.addEventListener('click', e => {
+                e.stopPropagation();
+                const idx = parseInt(e.target.dataset.index);
+                moveLayerDown(idx);
             });
         });
 
@@ -1138,7 +1215,7 @@
         const { x, y } = getCanvasCoords(e);
         let hit = false;
 
-        if (layer.type === 'image') {
+        if (layer.type === 'image' || layer.type === 'background') {
             if (x >= layer.x && x <= layer.x + layer.width &&
                 y >= layer.y && y <= layer.y + layer.height) {
                 hit = true;
@@ -1172,9 +1249,12 @@
         let newX = x - dragOffsetX;
         let newY = y - dragOffsetY;
 
-        if (layer.type === 'image') {
-            newX = Math.max(0, Math.min(newX, canvas.width - layer.width));
-            newY = Math.max(0, Math.min(newY, canvas.height - layer.height));
+        if (layer.type === 'image' || layer.type === 'background') {
+            // No restringir posición para el fondo? Mejor permitir arrastrarlo libremente.
+            // Para que el fondo pueda moverse, no limitamos.
+            // Pero si queremos que ocupe todo el canvas, podríamos forzar x=0,y=0.
+            // Por ahora, permitimos moverlo, aunque eso podría dejar áreas sin cubrir.
+            // Para mantener la funcionalidad, no limitamos.
         }
 
         layer.x = newX;
@@ -1209,8 +1289,30 @@
         if (!file) return;
         const img = new Image();
         img.onload = () => {
-            backgroundImage = img;
+            // Buscar si ya existe una capa de fondo
+            const bgIndex = layers.findIndex(l => l.type === 'background');
+            const newBgLayer = {
+                id: generateId(),
+                type: 'background',
+                image: img,
+                originalWidth: img.width,
+                originalHeight: img.height,
+                x: 0,
+                y: 0,
+                width: img.width,
+                height: img.height,
+                opacity: 1,
+                rotation: 0,
+                pattern: false,
+            };
+            if (bgIndex !== -1) {
+                layers[bgIndex] = newBgLayer;
+            } else {
+                layers.unshift(newBgLayer); // poner al inicio para que sea fondo por defecto
+            }
             resizeCanvasToBackground();
+            updateLayersPanel();
+            renderCanvas();
             bgFileInput.value = '';
         };
         img.src = URL.createObjectURL(file);
@@ -1308,12 +1410,14 @@
     downloadBtn.addEventListener('click', () => {
         renderCanvas(false);
         const link = document.createElement('a');
-        link.download = backgroundImage ? 'imagen_con_marca.png' : 'lienzo.png';
+        link.download = layers.some(l => l.type === 'background') ? 'imagen_con_marca.png' : 'lienzo.png';
         link.href = canvas.toDataURL('image/png');
         link.click();
         renderCanvas(true);
     });
 
+    // Inicializar con un fondo por defecto? No, dejamos sin fondo.
+    // Pero podemos crear una capa de fondo si queremos? Mejor empezar sin fondo.
     resizeCanvasToBackground();
     updateLayersPanel();
     startAnimation();
