@@ -3,43 +3,23 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Your Title</title>
+    <title>Your Original Page Title</title>
     <style>
         img {
             max-width: 100%;
             height: auto;
         }
-        /* Add other styles as needed */
     </style>
 </head>
 <body>
-    <canvas id="canvas" style="width: 100%; height: auto;"></canvas>
+    <h1>Your Original Page Name</h1>
+    <p>Your original content here without emojis.</p>
+    <h2>New Patterns</h2>
+    <p>You can add your new patterns here.</p>
+    <h2>GIF Export Support</h2>
+    <p>Instructions on how to export as GIF can go here.</p>
     <script>
-        function updateLayersPanel(){
-            // Code to update layers panel
-        }
-
-        function init() {
-            // Initialization code
-            updateLayersPanel(); // Ensure this is called after initialization
-        }
-
-        function maintainAspectRatio(originalWidth, originalHeight, maxWidth) {
-            const ratio = originalHeight / originalWidth;
-            const newWidth = maxWidth;
-            const newHeight = newWidth * ratio;
-            return { width: newWidth, height: newHeight };
-        }
-
-        // Example of using maintainAspectRatio
-        const image = new Image();
-        image.src = 'your-image-source.jpg';
-        image.onload = function() {
-            const { width, height } = maintainAspectRatio(image.width, image.height, 500);
-            // Use width and height as needed
-        };
-
-        init();
+        // Maintain all editing options here
     </script>
 </body>
 </html>
