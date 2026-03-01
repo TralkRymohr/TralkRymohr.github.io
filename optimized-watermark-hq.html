@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Optimized Watermark Generator</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            margin: 20px;
+        }
+        canvas {
+            border: 1px solid #ccc;
+        }
+    </style>
+</head>
+<body>
+    <h1>Optimized Watermark Generator</h1>
+    <canvas id="canvas"></canvas>
+    <br />
+    <button id="generate">Generate Watermark</button>
+    <button id="export-gif">Export as GIF</button>
+    <button id="export-png">Export as PNG</button>
+    <button id="export-jpg">Export as JPG</button>
+    <button id="export-webp">Export as WEBP</button>
+    <script>
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
+
+        // Set canvas dimensions (DPI-aware)
+        const dpi = window.devicePixelRatio;
+        canvas.width = 800 * dpi;
+        canvas.height = 600 * dpi;
+        ctx.scale(dpi, dpi);
+
+        function drawWatermark() {
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = 'bold 30px Arial';
+            ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+            ctx.fillText('Your Watermark', 50, 100);
+        }
+
+        document.getElementById('generate').addEventListener('click', drawWatermark);
+
+        function exportImage(format) {
+            let link = document.createElement('a');
+            let data;
+            if (format === 'gif') {
+                // Placeholder for GIF export with quality control
+                // Using a library like gif.js can be useful here
+            } else {
+                data = canvas.toDataURL(`image/${format}`);
+            }
+            link.href = data;
+            link.download = `watermark.${format}`;
+            link.click();
+        }
+
+        document.getElementById('export-gif').addEventListener('click', () => exportImage('gif'));
+        document.getElementById('export-png').addEventListener('click', () => exportImage('png'));
+        document.getElementById('export-jpg').addEventListener('click', () => exportImage('jpeg'));
+        document.getElementById('export-webp').addEventListener('click', () => exportImage('webp'));
+    </script>
+</body>
+</html>
