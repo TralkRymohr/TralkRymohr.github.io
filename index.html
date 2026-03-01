@@ -96,7 +96,7 @@
             height: auto;
             box-shadow: 0 8px 16px rgba(0,0,0,0.6);
             cursor: default;
-            background: #1a1a2e;
+            background: transparent; /* para que se vea el fondo del wrapper */
         }
         .controls-panel {
             flex: 1;
@@ -697,10 +697,8 @@
     }
 
     function renderCanvas(showSelection = true) {
+        // Limpiar completamente el canvas (fondo transparente)
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        // Fondo sólido por defecto (si no hay capa de fondo, se verá este)
-        ctx.fillStyle = '#1a1a2e';
-        ctx.fillRect(0, 0, canvas.width, canvas.height);
 
         // Dibujar todas las capas en orden (la capa de fondo puede estar en cualquier posición)
         layers.forEach(layer => drawLayer(layer));
@@ -1249,14 +1247,7 @@
         let newX = x - dragOffsetX;
         let newY = y - dragOffsetY;
 
-        if (layer.type === 'image' || layer.type === 'background') {
-            // No restringir posición para el fondo? Mejor permitir arrastrarlo libremente.
-            // Para que el fondo pueda moverse, no limitamos.
-            // Pero si queremos que ocupe todo el canvas, podríamos forzar x=0,y=0.
-            // Por ahora, permitimos moverlo, aunque eso podría dejar áreas sin cubrir.
-            // Para mantener la funcionalidad, no limitamos.
-        }
-
+        // No restringimos posición para ninguna capa (pueden moverse libremente)
         layer.x = newX;
         layer.y = newY;
         renderCanvas();
@@ -1416,8 +1407,7 @@
         renderCanvas(true);
     });
 
-    // Inicializar con un fondo por defecto? No, dejamos sin fondo.
-    // Pero podemos crear una capa de fondo si queremos? Mejor empezar sin fondo.
+    // Inicializar sin fondo (transparente)
     resizeCanvasToBackground();
     updateLayersPanel();
     startAnimation();
